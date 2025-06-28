@@ -1,0 +1,2392 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>在庫・価格管理アプリ</title>
+    <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
+    <!-- ZXing-js ライブラリ: バーコード自動読み取り機能 -->
+    <script src="https://unpkg.com/@zxing/library@latest/umd/index.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
+            background-color: #f8fafc;
+            min-height: 100vh;
+            line-height: 1.6;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 0 16px;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+            padding: 16px 0;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+
+        .header-content {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .logo {
+            color: white;
+            font-size: 24px;
+            font-weight: 700;
+            text-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+
+        .main-content {
+            padding: 24px 0;
+            min-height: calc(100vh - 80px);
+        }
+
+        .tabs {
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+            margin-bottom: 24px;
+            overflow: hidden;
+        }
+
+        .tab-list {
+            display: flex;
+            background: #f1f5f9;
+        }
+
+        .tab {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 4px;
+            padding: 16px 8px;
+            cursor: pointer;
+            font-weight: 600;
+            font-size: 12px;
+            text-align: center;
+            transition: all 0.3s ease;
+            color: #64748b;
+            border: none;
+            background: transparent;
+        }
+
+        .tab.active {
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+        }
+
+        .tab:hover:not(.active) {
+            background: #e2e8f0;
+            color: #475569;
+        }
+
+        .tab-icon {
+            width: 24px;
+            height: 24px;
+        }
+
+        @media (max-width: 768px) {
+            .tab {
+                font-size: 11px;
+                padding: 12px 4px;
+            }
+            .tab-icon {
+                width: 20px;
+                height: 20px;
+            }
+        }
+
+        .section-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 24px;
+            flex-wrap: wrap;
+            gap: 16px;
+        }
+
+        .section-header h2 {
+            font-size: 28px;
+            font-weight: 800;
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .btn-group {
+            display: flex;
+            gap: 12px;
+            flex-wrap: wrap;
+        }
+
+        .btn {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 12px 20px;
+            border: none;
+            border-radius: 8px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-size: 14px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+            text-decoration: none;
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
+        }
+
+        .btn:active {
+            transform: translateY(0);
+        }
+
+        .btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white;
+        }
+
+        .btn-success {
+            background: linear-gradient(135deg, #84fab0, #8fd3f4);
+            color: #0f766e;
+        }
+
+        .btn-secondary {
+            background: #e2e8f0;
+            color: #475569;
+        }
+
+        .btn-danger {
+            background: linear-gradient(135deg, #ff9a9e, #fecfef);
+            color: #dc2626;
+        }
+
+        @media (max-width: 480px) {
+            .btn {
+                padding: 10px 16px;
+                font-size: 13px;
+            }
+            .section-header h2 {
+                font-size: 24px;
+            }
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 16px;
+            margin-bottom: 24px;
+        }
+
+        .stat-card {
+            background: white;
+            border-radius: 16px;
+            padding: 24px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+            border: 1px solid #f1f5f9;
+            transition: transform 0.3s ease;
+        }
+
+        .stat-card:hover {
+            transform: translateY(-4px);
+        }
+
+        .stat-card.alert {
+            background: linear-gradient(135deg, #fef2f2, #fee2e2);
+            border-color: #fca5a5;
+        }
+
+        .stat-card.warning {
+            background: linear-gradient(135deg, #fffbeb, #fef3c7);
+            border-color: #fcd34d;
+        }
+
+        .stat-card.success {
+            background: linear-gradient(135deg, #f0fdf4, #dcfce7);
+            border-color: #86efac;
+        }
+
+        .stat-header {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 12px;
+            font-weight: 600;
+        }
+
+        .stat-header.alert { color: #dc2626; }
+        .stat-header.warning { color: #d97706; }
+        .stat-header.success { color: #059669; }
+
+        .stat-value {
+            font-size: 32px;
+            font-weight: 900;
+        }
+
+        .stat-value.alert { color: #dc2626; }
+        .stat-value.warning { color: #f59e0b; }
+        .stat-value.success { color: #10b981; }
+
+        .search-filter {
+            display: flex;
+            gap: 12px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
+
+        .search-input {
+            flex: 1;
+            position: relative;
+            min-width: 200px;
+        }
+
+        .search-input input {
+            width: 100%;
+            padding: 12px 16px 12px 48px;
+            border: 2px solid #e2e8f0;
+            border-radius: 12px;
+            font-size: 14px;
+            transition: all 0.3s ease;
+            background: white;
+        }
+
+        .search-input input:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 4px rgba(102, 126, 234, 0.1);
+        }
+
+        .search-icon {
+            position: absolute;
+            left: 16px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: #9ca3af;
+        }
+
+        .filter-select {
+            padding: 12px 16px;
+            border: 2px solid #e2e8f0;
+            border-radius: 12px;
+            font-size: 14px;
+            background: white;
+            min-width: 150px;
+        }
+
+        .filter-select:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 4px rgba(102, 126, 234, 0.1);
+        }
+
+        .table-container {
+            background: white;
+            border-radius: 16px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+            overflow: hidden;
+        }
+
+        .table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        .table thead {
+            background: linear-gradient(135deg, #f8fafc, #e2e8f0);
+        }
+
+        .table th {
+            padding: 16px 20px;
+            text-align: left;
+            font-size: 12px;
+            font-weight: 700;
+            color: #475569;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+        }
+
+        .table td {
+            padding: 20px;
+            border-top: 1px solid #f1f5f9;
+        }
+
+        .table tr:hover {
+            background: #f8fafc;
+        }
+
+        .table tr.low-stock {
+            background: linear-gradient(90deg, #fef2f2, #fff);
+        }
+
+        .table tr.expiring {
+            background: linear-gradient(90deg, #fffbeb, #fff);
+        }
+
+        @media (max-width: 768px) {
+            .table-container {
+                overflow-x: auto;
+            }
+            
+            .table th,
+            .table td {
+                padding: 12px 8px;
+                font-size: 12px;
+            }
+            
+            .product-details {
+                font-size: 11px !important;
+            }
+        }
+
+        .product-info {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .product-name {
+            font-weight: 700;
+            color: #1e293b;
+            font-size: 16px;
+        }
+
+        .product-details {
+            font-size: 14px;
+            color: #64748b;
+        }
+
+        .product-category {
+            display: inline-flex;
+            align-items: center;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 600;
+            background: linear-gradient(135deg, #dbeafe, #bfdbfe);
+            color: #1e40af;
+        }
+
+        .stock-info {
+            font-size: 16px;
+            font-weight: 600;
+        }
+
+        .stock-low {
+            color: #dc2626;
+        }
+
+        .stock-normal {
+            color: #64748b;
+        }
+
+        .price-info {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+
+        .price-value {
+            font-weight: 700;
+            color: #059669;
+            font-size: 16px;
+        }
+
+        .price-store {
+            font-size: 12px;
+            color: #64748b;
+        }
+
+        .expiry-date {
+            font-size: 14px;
+            font-weight: 600;
+        }
+
+        .expiry-normal { color: #64748b; }
+        .expiry-warning { color: #f59e0b; }
+
+        .actions {
+            display: flex;
+            gap: 8px;
+        }
+
+        .action-btn {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 40px;
+            height: 40px;
+            border: none;
+            border-radius: 10px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .action-btn.edit {
+            background: linear-gradient(135deg, #dbeafe, #bfdbfe);
+            color: #2563eb;
+        }
+
+        .action-btn.edit:hover {
+            background: linear-gradient(135deg, #bfdbfe, #93c5fd);
+            transform: scale(1.1);
+        }
+
+        .action-btn.delete {
+            background: linear-gradient(135deg, #fee2e2, #fecaca);
+            color: #dc2626;
+        }
+
+        .action-btn.delete:hover {
+            background: linear-gradient(135deg, #fecaca, #fca5a5);
+            transform: scale(1.1);
+        }
+
+        /* モーダル */
+        .modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.6);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 16px;
+            z-index: 1000;
+            backdrop-filter: blur(4px);
+        }
+
+        .modal.hidden {
+            display: none;
+        }
+
+        .modal-content {
+            background: white;
+            border-radius: 20px;
+            padding: 32px;
+            max-width: 600px;
+            width: 100%;
+            max-height: 90vh;
+            overflow-y: auto;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
+        }
+
+        .modal-header {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 24px;
+            padding-bottom: 16px;
+            border-bottom: 2px solid #f1f5f9;
+        }
+
+        .modal-title {
+            font-size: 24px;
+            font-weight: 800;
+            color: #1e293b;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-label {
+            display: block;
+            margin-bottom: 8px;
+            font-size: 14px;
+            font-weight: 600;
+            color: #374151;
+        }
+
+        .form-input {
+            width: 100%;
+            padding: 12px 16px;
+            border: 2px solid #e5e7eb;
+            border-radius: 12px;
+            font-size: 14px;
+            transition: all 0.3s ease;
+        }
+
+        .form-input:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 4px rgba(102, 126, 234, 0.1);
+        }
+
+        .form-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 16px;
+        }
+
+        @media (max-width: 480px) {
+            .form-grid {
+                grid-template-columns: 1fr;
+            }
+            .modal-content {
+                padding: 24px;
+            }
+        }
+
+        /* カメラスキャン */
+        .camera-container {
+            position: relative;
+            width: 100%;
+            max-width: 400px;
+            margin: 0 auto 20px;
+            background: #000;
+            border-radius: 16px;
+            overflow: hidden;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+        }
+
+        .camera-scanner {
+            width: 100%;
+            height: 300px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            position: relative;
+        }
+
+        .camera-video {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            border-radius: 16px;
+        }
+
+        .camera-overlay {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 200px;
+            height: 100px;
+            border: 3px solid #10b981;
+            border-radius: 8px;
+            pointer-events: none;
+            z-index: 10;
+        }
+
+        .camera-overlay::before {
+            content: '';
+            position: absolute;
+            top: -6px;
+            left: -6px;
+            right: -6px;
+            bottom: -6px;
+            border: 2px solid rgba(16, 185, 129, 0.4);
+            border-radius: 12px;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0% { opacity: 1; transform: scale(1); }
+            50% { opacity: 0.6; transform: scale(1.05); }
+            100% { opacity: 1; transform: scale(1); }
+        }
+
+        .camera-controls {
+            display: flex;
+            justify-content: center;
+            gap: 12px;
+            margin: 20px 0;
+            flex-wrap: wrap;
+        }
+
+        .scan-result {
+            background: linear-gradient(135deg, #f0fdf4, #dcfce7);
+            border: 2px solid #86efac;
+            border-radius: 12px;
+            padding: 16px;
+            margin: 16px 0;
+            text-align: center;
+            font-weight: 600;
+        }
+
+        .scan-result.success {
+            color: #166534;
+        }
+
+        .scan-result.error {
+            background: linear-gradient(135deg, #fef2f2, #fee2e2);
+            border-color: #fca5a5;
+            color: #dc2626;
+        }
+
+        .camera-status {
+            text-align: center;
+            margin-bottom: 16px;
+            font-size: 14px;
+            color: #64748b;
+            font-weight: 500;
+        }
+
+        .info-box {
+            background: linear-gradient(135deg, #f0f9ff, #e0f2fe);
+            border: 2px solid #7dd3fc;
+            border-radius: 12px;
+            padding: 20px;
+            margin: 20px 0;
+        }
+
+        .info-box h4 {
+            font-weight: 700;
+            color: #0369a1;
+            margin-bottom: 12px;
+            font-size: 16px;
+        }
+
+        .info-box ul {
+            font-size: 14px;
+            color: #0369a1;
+            padding-left: 20px;
+        }
+
+        .info-box ul li {
+            margin-bottom: 8px;
+        }
+
+        .form-help {
+            font-size: 12px;
+            color: #64748b;
+            margin-top: 4px;
+        }
+
+        .test-codes {
+            background: #f8fafc;
+            border: 1px solid #e2e8f0;
+            border-radius: 12px;
+            padding: 16px;
+            margin: 16px 0;
+        }
+
+        .test-code-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 8px 0;
+            border-bottom: 1px solid #e2e8f0;
+        }
+
+        .test-code-item:last-child {
+            border-bottom: none;
+        }
+
+        .test-code {
+            font-family: monospace;
+            font-weight: bold;
+            color: #374151;
+        }
+
+        .test-btn {
+            background: #10b981;
+            color: white;
+            border: none;
+            padding: 4px 12px;
+            border-radius: 6px;
+            font-size: 12px;
+            cursor: pointer;
+            transition: background 0.3s;
+        }
+
+        .test-btn:hover {
+            background: #059669;
+        }
+
+        /* ショッピングリスト */
+        .shopping-list {
+            background: white;
+            border-radius: 16px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+            overflow: hidden;
+        }
+
+        .shopping-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 24px;
+            border-bottom: 1px solid #f1f5f9;
+            transition: background 0.3s ease;
+        }
+
+        .shopping-item:hover {
+            background: #f8fafc;
+        }
+
+        .shopping-item:last-child {
+            border-bottom: none;
+        }
+
+        .shopping-item-info h3 {
+            font-size: 18px;
+            font-weight: 700;
+            color: #1e293b;
+            margin-bottom: 8px;
+        }
+
+        .shopping-item-details {
+            font-size: 14px;
+            color: #64748b;
+            margin-bottom: 8px;
+        }
+
+        .shopping-item-stock {
+            font-size: 14px;
+            color: #dc2626;
+            font-weight: 600;
+            margin-bottom: 4px;
+        }
+
+        .shopping-item-price {
+            font-size: 14px;
+            color: #059669;
+            font-weight: 600;
+        }
+
+        .empty-state {
+            padding: 60px 24px;
+            text-align: center;
+            color: #64748b;
+        }
+
+        .empty-icon {
+            margin: 0 auto 20px;
+            color: #cbd5e1;
+        }
+
+        /* 価格管理 */
+        .price-section {
+            background: white;
+            border-radius: 16px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+            padding: 24px;
+            margin-bottom: 20px;
+        }
+
+        .price-form {
+            background: white;
+            border-radius: 16px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+            padding: 24px;
+            margin-bottom: 24px;
+        }
+
+        .price-form h3 {
+            font-size: 20px;
+            font-weight: 700;
+            margin-bottom: 20px;
+            color: #1e293b;
+        }
+
+        .price-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 16px;
+            margin-bottom: 20px;
+        }
+
+        .price-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 16px;
+        }
+
+        .price-table th {
+            padding: 12px;
+            border-bottom: 2px solid #e5e7eb;
+            text-align: left;
+            font-weight: 700;
+            color: #374151;
+        }
+
+        .price-table td {
+            padding: 12px;
+            border-bottom: 1px solid #f3f4f6;
+        }
+
+        .price-table tr:first-child {
+            background: linear-gradient(135deg, #f0fdf4, #dcfce7);
+        }
+
+        .no-prices {
+            color: #64748b;
+            font-style: italic;
+        }
+
+        .badge {
+            display: inline-flex;
+            align-items: center;
+            padding: 4px 12px;
+            border-radius: 16px;
+            font-size: 12px;
+            font-weight: 600;
+        }
+
+        .badge-success {
+            background: linear-gradient(135deg, #dcfce7, #bbf7d0);
+            color: #166534;
+        }
+
+        .hidden {
+            display: none !important;
+        }
+
+        /* レスポンシブ改善 */
+        @media (max-width: 640px) {
+            .container {
+                padding: 0 12px;
+            }
+            
+            .main-content {
+                padding: 16px 0;
+            }
+            
+            .stats-grid {
+                grid-template-columns: 1fr;
+                gap: 12px;
+            }
+            
+            .search-filter {
+                flex-direction: column;
+            }
+            
+            .search-input {
+                min-width: 100%;
+            }
+            
+            .btn-group {
+                justify-content: center;
+            }
+        }
+
+        .permission-guide {
+            background: #fef3c7;
+            border: 2px solid #fcd34d;
+            border-radius: 12px;
+            padding: 16px;
+            margin: 16px 0;
+        }
+
+        .permission-guide h4 {
+            color: #d97706;
+            font-weight: 700;
+            margin-bottom: 12px;
+        }
+
+        .permission-guide ol {
+            color: #92400e;
+            padding-left: 20px;
+        }
+
+        .permission-guide li {
+            margin-bottom: 8px;
+        }
+    </style>
+</head>
+<body>
+    <header class="header">
+        <div class="container">
+            <div class="header-content">
+                <i data-lucide="package" style="width: 32px; height: 32px;"></i>
+                <span class="logo">在庫・価格管理</span>
+            </div>
+        </div>
+    </header>
+
+    <main class="main-content">
+        <div class="container">
+            <div class="tabs">
+                <div class="tab-list">
+                    <button class="tab active" data-tab="inventory">
+                        <i data-lucide="package" class="tab-icon"></i>
+                        <span>在庫管理</span>
+                    </button>
+                    <button class="tab" data-tab="price">
+                        <i data-lucide="trending-up" class="tab-icon"></i>
+                        <span>価格管理</span>
+                    </button>
+                    <button class="tab" data-tab="shopping">
+                        <i data-lucide="shopping-cart" class="tab-icon"></i>
+                        <span>買い物リスト</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- 在庫管理タブ -->
+            <div id="inventory-tab" class="tab-content">
+                <div class="section-header">
+                    <h2>在庫管理</h2>
+                    <div class="btn-group">
+                        <button class="btn btn-success" onclick="showJanSearchModal()">
+                            <i data-lucide="scan-line" style="width: 20px; height: 20px;"></i>
+                            自動スキャン
+                        </button>
+                        <button class="btn btn-primary" onclick="showAddProductModal()">
+                            <i data-lucide="plus" style="width: 20px; height: 20px;"></i>
+                            手動追加
+                        </button>
+                    </div>
+                </div>
+
+                <div class="stats-grid">
+                    <div class="stat-card alert">
+                        <div class="stat-header alert">
+                            <i data-lucide="alert-triangle" style="width: 24px; height: 24px;"></i>
+                            <h3>在庫不足</h3>
+                        </div>
+                        <p class="stat-value alert" id="low-stock-count">0</p>
+                    </div>
+                    <div class="stat-card warning">
+                        <div class="stat-header warning">
+                            <i data-lucide="clock" style="width: 24px; height: 24px;"></i>
+                            <h3>期限間近</h3>
+                        </div>
+                        <p class="stat-value warning" id="expiring-count">0</p>
+                    </div>
+                    <div class="stat-card success">
+                        <div class="stat-header success">
+                            <i data-lucide="package" style="width: 24px; height: 24px;"></i>
+                            <h3>総商品数</h3>
+                        </div>
+                        <p class="stat-value success" id="total-products">0</p>
+                    </div>
+                </div>
+
+                <div class="search-filter">
+                    <div class="search-input">
+                        <i data-lucide="search" class="search-icon" style="width: 20px; height: 20px;"></i>
+                        <input type="text" id="search-input" placeholder="商品名・ブランドで検索...">
+                    </div>
+                    <select class="filter-select" id="category-filter">
+                        <option value="all">すべてのカテゴリ</option>
+                        <option value="日用品">日用品</option>
+                        <option value="食料品">食料品</option>
+                    </select>
+                </div>
+
+                <div class="table-container">
+                    <table class="table">
+                        <thead>
+                            <tr>
+                                <th>商品情報</th>
+                                <th>在庫数</th>
+                                <th>最安価格</th>
+                                <th>期限</th>
+                                <th>操作</th>
+                            </tr>
+                        </thead>
+                        <tbody id="products-table-body">
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- 価格管理タブ -->
+            <div id="price-tab" class="tab-content hidden">
+                <div class="section-header">
+                    <h2>価格管理</h2>
+                </div>
+
+                <div class="price-form">
+                    <h3>価格情報追加</h3>
+                    <div class="price-grid">
+                        <select id="price-product-select" class="form-input">
+                            <option value="">商品を選択</option>
+                        </select>
+                        <input type="text" id="price-store-input" placeholder="店舗名" class="form-input">
+                        <input type="number" id="price-value-input" placeholder="価格" class="form-input">
+                        <input type="date" id="price-date-input" class="form-input">
+                    </div>
+                    <button class="btn btn-success" onclick="addPrice()">
+                        <i data-lucide="plus" style="width: 16px; height: 16px;"></i>
+                        価格追加
+                    </button>
+                </div>
+
+                <div id="price-list"></div>
+            </div>
+
+            <!-- ショッピングリストタブ -->
+            <div id="shopping-tab" class="tab-content hidden">
+                <div class="section-header">
+                    <h2>買い物リスト</h2>
+                </div>
+
+                <div class="shopping-list" id="shopping-list"></div>
+            </div>
+        </div>
+    </main>
+
+    <!-- JANコード検索モーダル -->
+    <div id="jan-search-modal" class="modal hidden">
+        <div class="modal-content">
+            <div class="modal-header">
+                <i data-lucide="scan-line" style="width: 24px; height: 24px; color: #667eea;"></i>
+                <h3 class="modal-title">バーコード自動スキャン</h3>
+            </div>
+            
+            <div class="camera-status" id="camera-status">
+                バーコードを自動で読み取ります
+            </div>
+            
+            <div class="camera-container">
+                <div id="camera-scanner" class="camera-scanner">
+                    <div style="color: #64748b; text-align: center;">
+                        <i data-lucide="camera" style="width: 48px; height: 48px; margin-bottom: 12px;"></i>
+                        <p>カメラ準備中...</p>
+                    </div>
+                </div>
+                <div class="camera-overlay"></div>
+            </div>
+            
+            <div class="camera-controls">
+                <button class="btn btn-success" onclick="startCamera()" id="start-camera-btn">
+                    <i data-lucide="play" style="width: 20px; height: 20px;"></i>
+                    自動スキャン開始
+                </button>
+                <button class="btn btn-danger" onclick="stopCamera()" id="stop-camera-btn" style="display: none;">
+                    <i data-lucide="square" style="width: 20px; height: 20px;"></i>
+                    停止
+                </button>
+                <button class="btn btn-primary" onclick="requestCameraPermission()" id="permission-btn">
+                    <i data-lucide="shield-check" style="width: 20px; height: 20px;"></i>
+                    権限許可
+                </button>
+            </div>
+            
+            <div id="scan-result"></div>
+            
+            <hr style="margin: 24px 0; border: none; border-top: 1px solid #e5e7eb;">
+            
+            <div class="form-group">
+                <label class="form-label">JANコード（13桁）を入力</label>
+                <input type="text" id="jan-code-input" placeholder="バーコード下の13桁の数字を入力" class="form-input" maxlength="13">
+                <p class="form-help">例: 4901085031629</p>
+            </div>
+
+            <div class="test-codes">
+                <h4 style="margin-bottom: 12px; color: #374151;">🧪 テスト用JANコード（すぐに試せます！）</h4>
+                <div class="test-code-item">
+                    <div>
+                        <span class="test-code">4901085031629</span>
+                        <small style="color: #64748b; display: block;">ペプシコーラ 500ml</small>
+                    </div>
+                    <button class="test-btn" onclick="setTestJAN('4901085031629')">使用</button>
+                </div>
+                <div class="test-code-item">
+                    <div>
+                        <span class="test-code">4902430591232</span>
+                        <small style="color: #64748b; display: block;">ファブリーズ 370ml</small>
+                    </div>
+                    <button class="test-btn" onclick="setTestJAN('4902430591232')">使用</button>
+                </div>
+                <div class="test-code-item">
+                    <div>
+                        <span class="test-code">4901301348234</span>
+                        <small style="color: #64748b; display: block;">キューピーマヨネーズ 450g</small>
+                    </div>
+                    <button class="test-btn" onclick="setTestJAN('4901301348234')">使用</button>
+                </div>
+                <div class="test-code-item">
+                    <div>
+                        <span class="test-code">4901777320406</span>
+                        <small style="color: #64748b; display: block;">コカ・コーラ 500ml</small>
+                    </div>
+                    <button class="test-btn" onclick="setTestJAN('4901777320406')">使用</button>
+                </div>
+                <div style="text-align: center; margin-top: 12px; padding: 8px; background: #f0fdf4; border-radius: 6px;">
+                    <small style="color: #059669;">💡 <strong>ワンクリックで入力</strong>→「商品検索」で商品情報を自動取得</small>
+                </div>
+            </div>
+            
+            <div class="info-box">
+                <h4>💡 使用方法（自動バーコード読み取り対応）</h4>
+                <ul>
+                    <li><strong>🤖 自動スキャン：</strong>「自動スキャン開始」でバーコードを自動読み取り</li>
+                    <li><strong>📝 手動入力：</strong>商品パッケージのバーコード下の数字（13桁）を入力</li>
+                    <li><strong>🧪 テスト：</strong>上のテスト用コードをワンクリックで入力</li>
+                    <li><strong>⚡ 高速入力：</strong>13桁入力後、Enterキーで即座に検索</li>
+                    <li><strong>🔍 自動取得：</strong>商品情報（名前、ブランド、価格）を自動入力</li>
+                </ul>
+                
+                <div style="background: #f0fdf4; border: 1px solid #86efac; border-radius: 8px; padding: 12px; margin-top: 12px;">
+                    <h4 style="color: #059669; margin-bottom: 8px;">🎯 HTTPS環境の特徴</h4>
+                    <p style="color: #059669; font-size: 14px; margin: 0;">
+                        <strong>完全自動</strong>：バーコードをカメラに向けるだけで自動的に読み取り、商品検索まで実行されます。<br>
+                        <strong>高精度</strong>：ZXingライブラリにより、様々な形式のバーコードに対応。
+                    </p>
+                </div>
+            </div>
+
+            <div class="btn-group">
+                <button class="btn btn-primary" onclick="searchProductByJAN()" id="jan-search-btn">
+                    <i data-lucide="search" style="width: 20px; height: 20px;"></i>
+                    商品検索
+                </button>
+                <button class="btn btn-secondary" onclick="closeJanSearchModal()">
+                    <i data-lucide="x" style="width: 20px; height: 20px;"></i>
+                    閉じる
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 商品追加/編集モーダル -->
+    <div id="product-modal" class="modal hidden">
+        <div class="modal-content">
+            <div class="modal-header">
+                <i data-lucide="plus" style="width: 24px; height: 24px; color: #667eea;" id="modal-icon"></i>
+                <h3 class="modal-title" id="modal-title">商品追加</h3>
+                <span class="badge badge-success hidden" id="api-badge">自動取得</span>
+            </div>
+            
+            <div class="form-group">
+                <label class="form-label">商品名 *</label>
+                <input type="text" id="product-name" class="form-input" required>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">カテゴリ *</label>
+                <select id="product-category" class="form-input" required>
+                    <option value="日用品">日用品</option>
+                    <option value="食料品">食料品</option>
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">ブランド</label>
+                <input type="text" id="product-brand" class="form-input">
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">サイズ・容量</label>
+                <input type="text" id="product-size" class="form-input">
+            </div>
+
+            <div class="form-grid">
+                <div class="form-group">
+                    <label class="form-label">現在の在庫 *</label>
+                    <input type="number" id="product-current-stock" class="form-input" min="0" required>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">最小在庫数 *</label>
+                    <input type="number" id="product-min-stock" class="form-input" min="1" required>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">最終購入日</label>
+                <input type="date" id="product-last-purchase" class="form-input">
+            </div>
+
+            <div class="form-group" id="expiry-group">
+                <label class="form-label">有効期限</label>
+                <input type="date" id="product-expiry" class="form-input">
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">メモ</label>
+                <textarea id="product-memo" class="form-input" rows="3"></textarea>
+            </div>
+
+            <div class="btn-group">
+                <button class="btn btn-primary" onclick="saveProduct()" id="save-btn">
+                    <i data-lucide="check" style="width: 16px; height: 16px;"></i>
+                    追加
+                </button>
+                <button class="btn btn-secondary" onclick="closeProductModal()">
+                    <i data-lucide="x" style="width: 16px; height: 16px;"></i>
+                    キャンセル
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // グローバル変数
+        let products = [
+            {
+                id: 1,
+                name: 'トイレットペーパー',
+                category: '日用品',
+                brand: 'エリエール',
+                size: '12ロール',
+                currentStock: 8,
+                minStock: 3,
+                lastPurchaseDate: '2025-06-15',
+                expiryDate: null,
+                prices: [
+                    { store: 'ドラッグストアA', price: 580, date: '2025-06-15' },
+                    { store: 'スーパーB', price: 620, date: '2025-06-10' }
+                ],
+                memo: ''
+            },
+            {
+                id: 2,
+                name: '牛乳',
+                category: '食料品',
+                brand: '明治',
+                size: '1L',
+                currentStock: 2,
+                minStock: 1,
+                lastPurchaseDate: '2025-06-20',
+                expiryDate: '2025-06-30',
+                prices: [
+                    { store: 'スーパーB', price: 198, date: '2025-06-20' },
+                    { store: 'コンビニC', price: 230, date: '2025-06-18' }
+                ],
+                memo: '冷蔵庫保存'
+            },
+            {
+                id: 3,
+                name: '洗濯洗剤',
+                category: '日用品',
+                brand: 'アタック',
+                size: '900g',
+                currentStock: 1,
+                minStock: 2,
+                lastPurchaseDate: '2025-06-10',
+                expiryDate: null,
+                prices: [
+                    { store: 'ドラッグストアA', price: 398, date: '2025-06-10' },
+                    { store: 'ディスカウントストアD', price: 358, date: '2025-06-08' }
+                ],
+                memo: '詰め替え用もチェック'
+            }
+        ];
+
+        let activeTab = 'inventory';
+        let editingProduct = null;
+        let searchTerm = '';
+        let categoryFilter = 'all';
+        let currentStream = null;
+        let codeReader = null;
+        let isScanning = false;
+
+        // 楽天API検索機能（モック実装）
+        const mockApiData = {
+            '4901085031629': {
+                name: 'ペプシコーラ',
+                brand: 'ペプシ',
+                size: '500ml',
+                category: '食料品',
+                price: 148,
+                store: '楽天24'
+            },
+            '4902430591232': {
+                name: 'ファブリーズ',
+                brand: 'P&G',
+                size: '370ml',
+                category: '日用品',
+                price: 298,
+                store: 'ケンコーコム'
+            },
+            '4901301348234': {
+                name: 'キューピーマヨネーズ',
+                brand: 'キューピー',
+                size: '450g',
+                category: '食料品',
+                price: 268,
+                store: 'イトーヨーカドー'
+            },
+            '4901777320406': {
+                name: 'コカ・コーラ',
+                brand: 'コカ・コーラ',
+                size: '500ml',
+                category: '食料品',
+                price: 140,
+                store: 'Amazon'
+            }
+        };
+
+        // Lucideアイコン安全初期化関数
+        function safeCreateIcons() {
+            try {
+                if (typeof lucide !== 'undefined') {
+                    lucide.createIcons();
+                }
+            } catch (error) {
+                console.warn('Lucide icons could not be loaded:', error);
+            }
+        }
+
+        // 初期化
+        document.addEventListener('DOMContentLoaded', function() {
+            safeCreateIcons();
+            
+            // タブ切り替えイベント
+            document.querySelectorAll('.tab').forEach(tab => {
+                tab.addEventListener('click', function() {
+                    switchTab(this.dataset.tab);
+                });
+            });
+
+            // 検索・フィルタイベント
+            document.getElementById('search-input').addEventListener('input', function() {
+                searchTerm = this.value;
+                renderProducts();
+            });
+
+            document.getElementById('category-filter').addEventListener('change', function() {
+                categoryFilter = this.value;
+                renderProducts();
+            });
+
+            // JANコード入力制限とリアルタイムバリデーション
+            document.getElementById('jan-code-input').addEventListener('input', function() {
+                const input = this;
+                let value = input.value.replace(/\D/g, '').slice(0, 13);
+                input.value = value;
+                
+                // リアルタイムバリデーション表示
+                const helpElement = input.nextElementSibling;
+                if (value.length === 0) {
+                    helpElement.textContent = '例: 4901085031629';
+                    helpElement.style.color = '#64748b';
+                } else if (value.length < 13) {
+                    helpElement.textContent = `${value.length}/13桁 入力中...`;
+                    helpElement.style.color = '#f59e0b';
+                } else if (value.length === 13) {
+                    helpElement.textContent = '✅ 13桁入力完了！「商品検索」ボタンをクリック';
+                    helpElement.style.color = '#059669';
+                    helpElement.style.fontWeight = '600';
+                }
+            });
+
+            // Enterキーで検索実行
+            document.getElementById('jan-code-input').addEventListener('keypress', function(e) {
+                if (e.key === 'Enter' && this.value.length === 13) {
+                    searchProductByJAN();
+                }
+            });
+
+            // カテゴリ変更時の期限フィールド表示/非表示
+            document.getElementById('product-category').addEventListener('change', function() {
+                const expiryGroup = document.getElementById('expiry-group');
+                expiryGroup.style.display = this.value === '食料品' ? 'block' : 'none';
+            });
+
+            // 価格日付の初期値設定
+            document.getElementById('price-date-input').value = new Date().toISOString().split('T')[0];
+
+            // 初期レンダリング
+            renderProducts();
+            updateStats();
+            renderPriceList();
+            renderShoppingList();
+            updatePriceProductSelect();
+        });
+
+        // タブ切り替え
+        function switchTab(tabName) {
+            activeTab = tabName;
+            
+            document.querySelectorAll('.tab').forEach(tab => {
+                tab.classList.toggle('active', tab.dataset.tab === tabName);
+            });
+
+            document.querySelectorAll('.tab-content').forEach(content => {
+                content.classList.toggle('hidden', content.id !== `${tabName}-tab`);
+            });
+
+            if (tabName === 'price') {
+                renderPriceList();
+                updatePriceProductSelect();
+            } else if (tabName === 'shopping') {
+                renderShoppingList();
+            }
+        }
+
+        // 統計更新
+        function updateStats() {
+            const lowStockProducts = products.filter(p => p.currentStock <= p.minStock);
+            const expiringProducts = getExpiringProducts();
+            
+            document.getElementById('low-stock-count').textContent = lowStockProducts.length;
+            document.getElementById('expiring-count').textContent = expiringProducts.length;
+            document.getElementById('total-products').textContent = products.length;
+        }
+
+        // 期限間近商品取得
+        function getExpiringProducts() {
+            const today = new Date();
+            const nextWeek = new Date(today.getTime() + 7 * 24 * 60 * 60 * 1000);
+            return products.filter(product => {
+                if (!product.expiryDate) return false;
+                const expiryDate = new Date(product.expiryDate);
+                return expiryDate <= nextWeek;
+            });
+        }
+
+        // 最安価格取得
+        function getBestPrice(prices) {
+            if (!prices.length) return null;
+            return prices.reduce((min, price) => price.price < min.price ? price : min);
+        }
+
+        // 商品一覧レンダリング
+        function renderProducts() {
+            const filteredProducts = products.filter(product => {
+                const matchesSearch = product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                                     product.brand.toLowerCase().includes(searchTerm.toLowerCase());
+                const matchesCategory = categoryFilter === 'all' || product.category === categoryFilter;
+                return matchesSearch && matchesCategory;
+            });
+
+            const tbody = document.getElementById('products-table-body');
+            tbody.innerHTML = '';
+
+            if (filteredProducts.length === 0) {
+                tbody.innerHTML = `
+                    <tr>
+                        <td colspan="5" class="empty-state">
+                            <i data-lucide="package" style="width: 48px; height: 48px; color: #cbd5e1; margin-bottom: 16px;"></i>
+                            <p>商品が見つかりませんでした</p>
+                        </td>
+                    </tr>
+                `;
+            } else {
+                filteredProducts.forEach(product => {
+                    const bestPrice = getBestPrice(product.prices);
+                    const isLowStock = product.currentStock <= product.minStock;
+                    const isExpiring = product.expiryDate && new Date(product.expiryDate) <= new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+
+                    const row = document.createElement('tr');
+                    if (isLowStock) row.classList.add('low-stock');
+                    if (isExpiring) row.classList.add('expiring');
+
+                    row.innerHTML = `
+                        <td>
+                            <div class="product-info">
+                                <div class="product-name">${product.name}</div>
+                                <div class="product-details">${product.brand} - ${product.size}</div>
+                                <span class="product-category">${product.category}</span>
+                            </div>
+                        </td>
+                        <td>
+                            <div class="stock-info">
+                                <span class="${isLowStock ? 'stock-low' : 'stock-normal'}">${product.currentStock}</span>
+                                <span class="stock-normal"> / ${product.minStock}</span>
+                            </div>
+                        </td>
+                        <td>
+                            ${bestPrice ? `
+                                <div class="price-info">
+                                    <div class="price-value">¥${bestPrice.price.toLocaleString()}</div>
+                                    <div class="price-store">${bestPrice.store}</div>
+                                </div>
+                            ` : '<span class="price-store">未登録</span>'}
+                        </td>
+                        <td>
+                            ${product.expiryDate ? 
+                                `<span class="expiry-date ${isExpiring ? 'expiry-warning' : 'expiry-normal'}">${product.expiryDate}</span>` : 
+                                '<span class="expiry-date expiry-normal">-</span>'
+                            }
+                        </td>
+                        <td>
+                            <div class="actions">
+                                <button class="action-btn edit" onclick="editProduct(${product.id})" title="編集">
+                                    <i data-lucide="edit-2" style="width: 16px; height: 16px;"></i>
+                                </button>
+                                <button class="action-btn delete" onclick="deleteProduct(${product.id})" title="削除">
+                                    <i data-lucide="trash-2" style="width: 16px; height: 16px;"></i>
+                                </button>
+                            </div>
+                        </td>
+                    `;
+                    tbody.appendChild(row);
+                });
+            }
+
+            safeCreateIcons();
+            updateStats();
+        }
+
+        // JANコード検索モーダル表示
+        function showJanSearchModal() {
+            document.getElementById('jan-search-modal').classList.remove('hidden');
+            document.getElementById('jan-code-input').value = '';
+            
+            // HTTPS接続チェック
+            const isSecure = location.protocol === 'https:' || 
+                           location.hostname === 'localhost' || 
+                           location.hostname === '127.0.0.1';
+            
+            if (!isSecure) {
+                updateCameraStatus('カメラを使用するにはHTTPS環境が必要です');
+                showScanResult(`
+                    <div style="background: #dbeafe; border: 2px solid #60a5fa; border-radius: 12px; padding: 16px; margin-bottom: 16px;">
+                        <h4 style="color: #1d4ed8; margin-bottom: 12px;">📸 カメラ機能を使用する方法</h4>
+                        
+                        <div style="background: #f0f9ff; border: 1px solid #7dd3fc; border-radius: 8px; padding: 12px; margin: 10px 0;">
+                            <h5 style="color: #0369a1; margin-bottom: 8px;">🚀 推奨方法：無料ホスティング</h5>
+                            <p style="color: #0369a1; font-size: 14px; margin-bottom: 8px;"><strong>GitHub Pages (無料・簡単):</strong></p>
+                            <ol style="color: #0369a1; font-size: 13px; margin-left: 16px;">
+                                <li>GitHubアカウントを作成</li>
+                                <li>新しいリポジトリを作成</li>
+                                <li>このHTMLファイルをアップロード</li>
+                                <li>Settings → Pages → Source → Deploy from branch</li>
+                                <li>自動でHTTPS URLが生成されます</li>
+                            </ol>
+                            
+                            <p style="color: #0369a1; font-size: 14px; margin: 8px 0;"><strong>その他の無料オプション:</strong></p>
+                            <p style="color: #0369a1; font-size: 13px;">• Netlify (netlify.com) - ドラッグ&ドロップで簡単</p>
+                            <p style="color: #0369a1; font-size: 13px;">• Vercel (vercel.com) - 高速デプロイ</p>
+                            <p style="color: #0369a1; font-size: 13px;">• Surge.sh (surge.sh) - コマンドライン不要</p>
+                        </div>
+                        
+                        <div style="background: #fef3c7; border: 1px solid #fcd34d; border-radius: 8px; padding: 12px; margin: 10px 0;">
+                            <h5 style="color: #d97706; margin-bottom: 8px;">⚡ 今すぐ試す方法</h5>
+                            <p style="color: #92400e; font-size: 13px;">
+                                <strong>ローカル開発:</strong> localhost または 127.0.0.1 でアクセスするとHTTP環境でもカメラが使用可能です。<br>
+                                <strong>簡易サーバー:</strong> Python の <code>python -m http.server</code> やNode.jsの <code>npx serve</code> を使用
+                            </p>
+                        </div>
+                        
+                        <div style="text-align: center; margin: 15px 0;">
+                            <a href="https://pages.github.com/" target="_blank" class="btn btn-primary" style="margin: 5px; text-decoration: none;">
+                                🌟 GitHub Pages を始める
+                            </a>
+                            <a href="https://netlify.com/" target="_blank" class="btn btn-success" style="margin: 5px; text-decoration: none;">
+                                ⚡ Netlify を試す
+                            </a>
+                        </div>
+                    </div>
+                `, false);
+                
+                // カメラ関連ボタンを非表示にする
+                document.getElementById('start-camera-btn').style.display = 'none';
+                document.getElementById('permission-btn').style.display = 'none';
+                document.getElementById('stop-camera-btn').style.display = 'none';
+                
+                // カメラコンテナを簡素化
+                const scannerElement = document.getElementById('camera-scanner');
+                scannerElement.innerHTML = `
+                    <div style="color: #64748b; text-align: center; padding: 40px;">
+                        <i data-lucide="globe" style="width: 48px; height: 48px; margin-bottom: 12px;"></i>
+                        <p><strong>HTTPS環境でカメラ使用可能</strong></p>
+                        <p style="font-size: 14px;">上記の方法でHTTPS環境に移行してください</p>
+                    </div>
+                `;
+                safeCreateIcons();
+            } else {
+                updateCameraStatus('バーコードを自動で読み取ります');
+                showScanResult('', false);
+                // カメラボタンを表示
+                document.getElementById('start-camera-btn').style.display = 'flex';
+                document.getElementById('permission-btn').style.display = 'flex';
+            }
+        }
+
+        // JANコード検索モーダル非表示
+        function closeJanSearchModal() {
+            stopCamera();
+            document.getElementById('jan-search-modal').classList.add('hidden');
+            
+            // スキャン状態をリセット
+            isScanning = false;
+            showScanResult('', false);
+        }
+
+        // カメラ状態更新
+        function updateCameraStatus(message, isError = false) {
+            const statusElement = document.getElementById('camera-status');
+            if (statusElement) {
+                statusElement.textContent = message;
+                statusElement.style.color = isError ? '#dc2626' : '#64748b';
+            }
+        }
+
+        // スキャン結果表示
+        function showScanResult(message, isError = false) {
+            const resultElement = document.getElementById('scan-result');
+            if (resultElement && message) {
+                resultElement.innerHTML = `
+                    <div class="scan-result ${isError ? 'error' : 'success'}">
+                        ${message}
+                    </div>
+                `;
+            } else if (resultElement) {
+                resultElement.innerHTML = '';
+            }
+        }
+
+        // カメラ権限確認
+        async function checkCameraPermission() {
+            try {
+                if (navigator.permissions) {
+                    const permission = await navigator.permissions.query({ name: 'camera' });
+                    return permission.state;
+                }
+                return 'unknown';
+            } catch (error) {
+                return 'unknown';
+            }
+        }
+
+        // ブラウザ検出
+        function detectBrowser() {
+            const userAgent = navigator.userAgent;
+            const isChrome = /Chrome/.test(userAgent) && /Google Inc/.test(navigator.vendor);
+            const isSafari = /Safari/.test(userAgent) && /Apple Computer/.test(navigator.vendor);
+            const isFirefox = /Firefox/.test(userAgent);
+            const isEdge = /Edg/.test(userAgent);
+            const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(userAgent);
+            const isIOS = /iPad|iPhone|iPod/.test(userAgent);
+            const isAndroid = /Android/.test(userAgent);
+            
+            return { isChrome, isSafari, isFirefox, isEdge, isMobile, isIOS, isAndroid };
+        }
+
+        // 詳細な権限ガイド表示
+        function showDetailedPermissionGuide() {
+            const browser = detectBrowser();
+            let guideHtml = '';
+            
+            if (browser.isIOS) {
+                guideHtml = `
+                    <div class="permission-guide">
+                        <h4>📱 iPhone/iPad Safari での設定方法</h4>
+                        <div style="background: #fff3cd; padding: 15px; border-radius: 8px; margin: 10px 0;">
+                            <strong>方法1: サイト設定から</strong><br>
+                            1️⃣ アドレスバー左の <strong>「あA」ボタン</strong> をタップ<br>
+                            2️⃣ <strong>「Webサイトの設定」</strong> をタップ<br>
+                            3️⃣ <strong>「カメラ」</strong> を <strong>「許可」</strong> に変更<br>
+                            4️⃣ ページを再読み込み<br><br>
+                            
+                            <strong>方法2: 設定アプリから</strong><br>
+                            1️⃣ <strong>設定アプリ</strong> を開く<br>
+                            2️⃣ <strong>Safari</strong> を選択<br>
+                            3️⃣ <strong>カメラ</strong> を <strong>「許可」</strong> に設定<br>
+                            4️⃣ Safariを再起動
+                        </div>
+                        <div style="background: #fee2e2; padding: 10px; border-radius: 6px; margin: 10px 0;">
+                            <strong>⚠️ 注意:</strong> プライベートブラウズモードでは権限が保存されません
+                        </div>
+                    </div>
+                `;
+            } else if (browser.isAndroid) {
+                guideHtml = `
+                    <div class="permission-guide">
+                        <h4>🤖 Android Chrome での設定方法</h4>
+                        <div style="background: #fff3cd; padding: 15px; border-radius: 8px; margin: 10px 0;">
+                            <strong>方法1: サイト設定から</strong><br>
+                            1️⃣ アドレスバー左の <strong>🔒マーク</strong> をタップ<br>
+                            2️⃣ <strong>「権限」</strong> をタップ<br>
+                            3️⃣ <strong>「カメラ」</strong> を <strong>「許可」</strong> に変更<br>
+                            4️⃣ ページを再読み込み<br><br>
+                            
+                            <strong>方法2: Chrome設定から</strong><br>
+                            1️⃣ Chrome右上の <strong>⋮ (3点メニュー)</strong> をタップ<br>
+                            2️⃣ <strong>「設定」</strong> → <strong>「サイトの設定」</strong><br>
+                            3️⃣ <strong>「カメラ」</strong> → <strong>「許可」</strong><br>
+                            4️⃣ このサイトを許可リストに追加
+                        </div>
+                        <div style="background: #dbeafe; padding: 10px; border-radius: 6px; margin: 10px 0;">
+                            <strong>💡 ヒント:</strong> システム設定でもChromeのカメラ権限を確認してください
+                        </div>
+                    </div>
+                `;
+            } else if (browser.isChrome) {
+                guideHtml = `
+                    <div class="permission-guide">
+                        <h4>💻 Chrome での設定方法</h4>
+                        <div style="background: #fff3cd; padding: 15px; border-radius: 8px; margin: 10px 0;">
+                            <strong>簡単な方法:</strong><br>
+                            1️⃣ アドレスバー左の <strong>🔒マーク</strong> をクリック<br>
+                            2️⃣ <strong>「カメラ」</strong> を <strong>「許可」</strong> に変更<br>
+                            3️⃣ ページを再読み込み<br><br>
+                            
+                            <strong>詳細設定:</strong><br>
+                            1️⃣ Chrome右上の <strong>⋮ → 設定</strong><br>
+                            2️⃣ <strong>「プライバシーとセキュリティ」</strong><br>
+                            3️⃣ <strong>「サイトの設定」</strong> → <strong>「カメラ」</strong><br>
+                            4️⃣ このサイトを <strong>「許可」</strong> リストに追加
+                        </div>
+                    </div>
+                `;
+            } else if (browser.isSafari) {
+                guideHtml = `
+                    <div class="permission-guide">
+                        <h4>🌐 Safari での設定方法</h4>
+                        <div style="background: #fff3cd; padding: 15px; border-radius: 8px; margin: 10px 0;">
+                            <strong>方法1: サイト設定</strong><br>
+                            1️⃣ メニューバーの <strong>「Safari」</strong><br>
+                            2️⃣ <strong>「このWebサイトの設定」</strong><br>
+                            3️⃣ <strong>「カメラ」</strong> を <strong>「許可」</strong> に変更<br><br>
+                            
+                            <strong>方法2: 環境設定</strong><br>
+                            1️⃣ <strong>Safari → 環境設定</strong><br>
+                            2️⃣ <strong>「Webサイト」</strong> タブ<br>
+                            3️⃣ <strong>「カメラ」</strong> を選択<br>
+                            4️⃣ このサイトを <strong>「許可」</strong> に設定
+                        </div>
+                    </div>
+                `;
+            } else {
+                guideHtml = `
+                    <div class="permission-guide">
+                        <h4>🌐 ブラウザでの設定方法</h4>
+                        <div style="background: #fff3cd; padding: 15px; border-radius: 8px; margin: 10px 0;">
+                            <strong>一般的な手順:</strong><br>
+                            1️⃣ アドレスバー左の <strong>🔒または🛡️マーク</strong> をクリック<br>
+                            2️⃣ <strong>「カメラ」</strong> または <strong>「権限」</strong> を選択<br>
+                            3️⃣ <strong>「許可」</strong> に変更<br>
+                            4️⃣ ページを再読み込み
+                        </div>
+                    </div>
+                `;
+            }
+            
+            return guideHtml;
+        }
+
+        // カメラ開始（バーコード自動読み取り対応）
+        async function startCamera() {
+            const startBtn = document.getElementById('start-camera-btn');
+            const stopBtn = document.getElementById('stop-camera-btn');
+            
+            startBtn.disabled = true;
+            updateCameraStatus('カメラ権限を確認中...');
+            
+            try {
+                // 事前に権限状態をチェック
+                const permissionState = await checkCameraPermission();
+                console.log('カメラ権限状態:', permissionState);
+                
+                if (permissionState === 'denied') {
+                    throw new Error('Permission explicitly denied');
+                }
+                
+                updateCameraStatus('カメラを起動中...');
+                
+                // ブラウザとデバイス情報を取得
+                const browser = detectBrowser();
+                
+                // ZXing バーコードリーダーを初期化
+                if (typeof ZXing !== 'undefined') {
+                    codeReader = new ZXing.BrowserMultiFormatReader();
+                    
+                    // 利用可能なカメラデバイスを取得
+                    const videoInputDevices = await codeReader.listVideoInputDevices();
+                    console.log('利用可能なカメラ:', videoInputDevices);
+                    
+                    let selectedDeviceId;
+                    
+                    // 背面カメラを優先して選択（モバイルデバイスの場合）
+                    if (browser.isMobile) {
+                        const backCamera = videoInputDevices.find(device => 
+                            device.label.toLowerCase().includes('back') || 
+                            device.label.toLowerCase().includes('rear') ||
+                            device.label.toLowerCase().includes('環境')
+                        );
+                        selectedDeviceId = backCamera ? backCamera.deviceId : videoInputDevices[0]?.deviceId;
+                    } else {
+                        selectedDeviceId = videoInputDevices[0]?.deviceId;
+                    }
+                    
+                    if (!selectedDeviceId) {
+                        throw new Error('カメラデバイスが見つかりません');
+                    }
+                    
+                    // バーコードスキャンを開始
+                    const videoElement = document.createElement('video');
+                    videoElement.className = 'camera-video';
+                    videoElement.style.width = '100%';
+                    videoElement.style.height = '100%';
+                    videoElement.style.objectFit = 'cover';
+                    
+                    const scannerElement = document.getElementById('camera-scanner');
+                    scannerElement.innerHTML = '';
+                    scannerElement.appendChild(videoElement);
+                    
+                    // ZXingでバーコード読み取り開始
+                    codeReader.decodeFromVideoDevice(selectedDeviceId, videoElement, (result, err) => {
+                        if (result) {
+                            const code = result.getText();
+                            console.log('バーコード検出:', code);
+                            
+                            // 13桁のJANコードかチェック
+                            if (code && code.length === 13 && /^\d+$/.test(code)) {
+                                document.getElementById('jan-code-input').value = code;
+                                
+                                // 入力時のバリデーション表示を更新
+                                const input = document.getElementById('jan-code-input');
+                                const helpElement = input.nextElementSibling;
+                                helpElement.textContent = '✅ バーコード自動読み取り完了！';
+                                helpElement.style.color = '#059669';
+                                helpElement.style.fontWeight = '600';
+                                
+                                updateCameraStatus('✅ バーコード読み取り成功！');
+                                showScanResult(`🎉 バーコード自動読み取り成功: ${code}<br>📦 商品情報を検索しています...`, false);
+                                
+                                // 自動的に商品検索を実行
+                                setTimeout(() => {
+                                    searchProductByJAN();
+                                }, 1500);
+                            } else if (code && code.length > 0) {
+                                // 13桁以外のコードが読み取られた場合
+                                showScanResult(`⚠️ ${code.length}桁のコードを検出: ${code}<br>JANコード（13桁）を読み取ってください`, false);
+                            }
+                        }
+                        
+                        if (err && !(err instanceof ZXing.NotFoundException)) {
+                            console.warn('バーコード読み取りエラー:', err);
+                        }
+                    });
+                    
+                    isScanning = true;
+                    
+                } else {
+                    // ZXingが利用できない場合は従来のカメラプレビューのみ
+                    console.warn('ZXingライブラリが読み込まれていません。プレビューのみ提供します。');
+                    
+                    const constraints = {
+                        video: {
+                            width: { ideal: 400 },
+                            height: { ideal: 300 },
+                            facingMode: browser.isMobile ? { ideal: "environment" } : "user"
+                        }
+                    };
+
+                    const stream = await navigator.mediaDevices.getUserMedia(constraints);
+                    
+                    const video = document.createElement('video');
+                    video.className = 'camera-video';
+                    video.autoplay = true;
+                    video.playsInline = true;
+                    video.muted = true;
+                    video.srcObject = stream;
+                    
+                    const scannerElement = document.getElementById('camera-scanner');
+                    scannerElement.innerHTML = '';
+                    scannerElement.appendChild(video);
+                    
+                    currentStream = stream;
+                }
+                
+                // ボタン状態を更新
+                startBtn.style.display = 'none';
+                stopBtn.style.display = 'flex';
+                startBtn.disabled = false;
+                
+                const scanTypeMessage = (typeof ZXing !== 'undefined') ? 
+                    '🤖 自動バーコード読み取り中...' : 
+                    '📸 カメラプレビュー表示中（手動で数字を入力してください）';
+                
+                updateCameraStatus('✅ カメラ起動完了！' + scanTypeMessage);
+                
+                if (typeof ZXing !== 'undefined') {
+                    showScanResult('🎯 バーコードをカメラに向けてください。自動で読み取ります！', false);
+                } else {
+                    showScanResult('📸 バーコードをカメラに向けて、下の13桁の数字を確認して入力してください', false);
+                }
+                
+            } catch (error) {
+                console.error('カメラ起動エラー:', error);
+                startBtn.disabled = false;
+                startBtn.style.display = 'flex';
+                stopBtn.style.display = 'none';
+                
+                const browser = detectBrowser();
+                let errorMessage = '';
+                let detailedGuide = '';
+                
+                if (error.name === 'NotAllowedError' || error.message === 'Permission explicitly denied') {
+                    errorMessage = '🚫 カメラ権限が拒否されています';
+                    detailedGuide = showDetailedPermissionGuide();
+                    
+                    // 権限再要求ボタンを追加
+                    detailedGuide += `
+                        <div style="text-align: center; margin: 20px 0;">
+                            <button onclick="requestCameraPermission()" class="btn btn-primary" style="margin: 5px;">
+                                🔄 権限を再要求
+                            </button>
+                            <button onclick="location.reload()" class="btn btn-secondary" style="margin: 5px;">
+                                📄 ページ再読み込み
+                            </button>
+                        </div>
+                    `;
+                } else if (error.name === 'NotFoundError') {
+                    errorMessage = '📷 カメラデバイスが見つかりません';
+                    detailedGuide = `
+                        <div class="permission-guide">
+                            <h4>📷 カメラが見つからない場合の対処法</h4>
+                            <div style="background: #fff3cd; padding: 15px; border-radius: 8px; margin: 10px 0;">
+                                <strong>確認事項:</strong><br>
+                                • カメラが正しく接続されているか<br>
+                                • 他のアプリ（Zoom、Teams等）でカメラが使用中でないか<br>
+                                • デバイスマネージャーでカメラドライバを確認<br>
+                                • ブラウザを再起動してみる
+                            </div>
+                        </div>
+                    `;
+                } else if (error.name === 'NotReadableError') {
+                    errorMessage = '⚠️ カメラが他のアプリで使用中です';
+                    detailedGuide = `
+                        <div class="permission-guide">
+                            <h4>🔒 カメラ使用中エラーの対処法</h4>
+                            <div style="background: #fff3cd; padding: 15px; border-radius: 8px; margin: 10px 0;">
+                                <strong>他のアプリを終了してください:</strong><br>
+                                • ビデオ通話アプリ（Zoom、Teams、Skype等）<br>
+                                • カメラアプリ<br>
+                                • ブラウザの他のタブ<br>
+                                • 背景で動作しているアプリ
+                            </div>
+                        </div>
+                    `;
+                } else {
+                    errorMessage = `❌ 不明なエラー: ${error.name}`;
+                    detailedGuide = showDetailedPermissionGuide();
+                }
+
+                const fullErrorMessage = `
+                    <div style="text-align: left;">
+                        <h3 style="color: #dc2626; margin-bottom: 16px;">${errorMessage}</h3>
+                        ${detailedGuide}
+                        <div style="background: #f0f9ff; padding: 15px; border-radius: 8px; margin: 15px 0;">
+                            <h4 style="color: #0369a1; margin-bottom: 8px;">💡 代替手段</h4>
+                            <p style="color: #0369a1;">カメラが使用できない場合は、商品パッケージのバーコード下にある<strong>13桁の数字を直接入力</strong>してください。</p>
+                        </div>
+                    </div>
+                `;
+
+                updateCameraStatus(errorMessage, true);
+                showScanResult(fullErrorMessage, true);
+            }
+        }
+
+        // カメラ権限を明示的に要求
+        async function requestCameraPermission() {
+            try {
+                updateCameraStatus('カメラ権限を要求中...');
+                
+                // 明示的に権限を要求
+                const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+                
+                // すぐに停止
+                stream.getTracks().forEach(track => track.stop());
+                
+                updateCameraStatus('✅ カメラ権限が許可されました！');
+                showScanResult('✅ カメラ権限が許可されました！「自動スキャン開始」ボタンをクリックしてください。', false);
+                
+            } catch (error) {
+                console.error('権限要求エラー:', error);
+                updateCameraStatus('権限要求に失敗しました', true);
+                
+                const detailedGuide = showDetailedPermissionGuide();
+                showScanResult(`
+                    <div style="text-align: left;">
+                        <h3 style="color: #dc2626; margin-bottom: 16px;">🚫 権限要求が拒否されました</h3>
+                        <p style="margin-bottom: 16px;">ブラウザの設定から手動で権限を許可してください。</p>
+                        ${detailedGuide}
+                    </div>
+                `, true);
+            }
+        }
+
+        // カメラ停止（ZXing対応）
+        function stopCamera() {
+            try {
+                // ZXingのコードリーダーを停止
+                if (codeReader) {
+                    codeReader.reset();
+                    codeReader = null;
+                    isScanning = false;
+                }
+                
+                // 通常のストリームも停止
+                if (currentStream) {
+                    currentStream.getTracks().forEach(track => track.stop());
+                    currentStream = null;
+                }
+                
+                const scannerElement = document.getElementById('camera-scanner');
+                scannerElement.innerHTML = `
+                    <div style="color: #64748b; text-align: center; padding: 40px;">
+                        <i data-lucide="camera-off" style="width: 48px; height: 48px; margin-bottom: 12px;"></i>
+                        <p><strong>カメラ停止中</strong></p>
+                        <p style="font-size: 14px;">「カメラ開始」で再開できます</p>
+                    </div>
+                `;
+                
+                document.getElementById('start-camera-btn').style.display = 'flex';
+                document.getElementById('stop-camera-btn').style.display = 'none';
+                
+                updateCameraStatus('カメラが停止されました');
+                safeCreateIcons();
+                
+            } catch (error) {
+                console.error('カメラ停止エラー:', error);
+            }
+        }
+
+        // テスト用JANコード設定
+        function setTestJAN(janCode) {
+            const input = document.getElementById('jan-code-input');
+            input.value = janCode;
+            
+            // 入力時のバリデーション表示を更新
+            const helpElement = input.nextElementSibling;
+            helpElement.textContent = '✅ 13桁入力完了！「商品検索」ボタンをクリック';
+            helpElement.style.color = '#059669';
+            helpElement.style.fontWeight = '600';
+            
+            // 商品名を表示
+            const productInfo = mockApiData[janCode];
+            const productName = productInfo ? productInfo.name : '商品';
+            
+            showScanResult(`✅ テスト用JANコード設定完了: ${janCode}<br>📦 ${productName} の情報を検索できます`, false);
+            
+            // 少し待ってから検索ボタンにフォーカス
+            setTimeout(() => {
+                document.getElementById('jan-search-btn').focus();
+            }, 100);
+        }
+
+        // JANコード検索
+        async function searchProductByJAN() {
+            const janCode = document.getElementById('jan-code-input').value;
+            
+            if (!janCode || janCode.length !== 13) {
+                showScanResult('❌ 正しい13桁のJANコードを入力してください', true);
+                return;
+            }
+
+            const searchBtn = document.getElementById('jan-search-btn');
+            const originalContent = searchBtn.innerHTML;
+            
+            searchBtn.innerHTML = '<i data-lucide="loader" style="width: 20px; height: 20px;"></i> 検索中...';
+            searchBtn.disabled = true;
+
+            // API検索のシミュレーション
+            await new Promise(resolve => setTimeout(resolve, 1500));
+
+            const productInfo = mockApiData[janCode];
+            
+            searchBtn.innerHTML = originalContent;
+            searchBtn.disabled = false;
+            safeCreateIcons();
+
+            if (productInfo) {
+                showScanResult(`✅ 商品が見つかりました: ${productInfo.name}`, false);
+                
+                setProductFormData({
+                    name: productInfo.name,
+                    brand: productInfo.brand,
+                    size: productInfo.size,
+                    category: productInfo.category,
+                    currentStock: 1,
+                    minStock: 1,
+                    lastPurchaseDate: new Date().toISOString().split('T')[0],
+                    expiryDate: '',
+                    memo: `JANコード: ${janCode}`
+                });
+
+                setTimeout(() => {
+                    closeJanSearchModal();
+                    showAddProductModal(true);
+                }, 1000);
+                
+            } else {
+                showScanResult(`❌ JANコード ${janCode} の商品が見つかりませんでした。手動で商品情報を入力してください。`, true);
+            }
+        }
+
+        // 商品追加モーダル表示
+        function showAddProductModal(fromApi = false) {
+            editingProduct = null;
+            document.getElementById('modal-title').textContent = '商品追加';
+            document.getElementById('modal-icon').setAttribute('data-lucide', 'plus');
+            document.getElementById('save-btn').innerHTML = '<i data-lucide="check" style="width: 16px; height: 16px;"></i> 追加';
+            document.getElementById('api-badge').classList.toggle('hidden', !fromApi);
+            
+            if (!fromApi) {
+                clearProductForm();
+            }
+            
+            document.getElementById('product-modal').classList.remove('hidden');
+            safeCreateIcons();
+        }
+
+        // 商品編集
+        function editProduct(id) {
+            const product = products.find(p => p.id === id);
+            if (!product) return;
+
+            editingProduct = product;
+            document.getElementById('modal-title').textContent = '商品編集';
+            document.getElementById('modal-icon').setAttribute('data-lucide', 'edit-2');
+            document.getElementById('save-btn').innerHTML = '<i data-lucide="check" style="width: 16px; height: 16px;"></i> 更新';
+            document.getElementById('api-badge').classList.add('hidden');
+            
+            setProductFormData(product);
+            document.getElementById('product-modal').classList.remove('hidden');
+            safeCreateIcons();
+        }
+
+        // 商品フォームデータ設定
+        function setProductFormData(data) {
+            document.getElementById('product-name').value = data.name || '';
+            document.getElementById('product-category').value = data.category || '日用品';
+            document.getElementById('product-brand').value = data.brand || '';
+            document.getElementById('product-size').value = data.size || '';
+            document.getElementById('product-current-stock').value = data.currentStock || 0;
+            document.getElementById('product-min-stock').value = data.minStock || 1;
+            document.getElementById('product-last-purchase').value = data.lastPurchaseDate || '';
+            document.getElementById('product-expiry').value = data.expiryDate || '';
+            document.getElementById('product-memo').value = data.memo || '';
+
+            const expiryGroup = document.getElementById('expiry-group');
+            expiryGroup.style.display = data.category === '食料品' ? 'block' : 'none';
+        }
+
+        // 商品フォームクリア
+        function clearProductForm() {
+            setProductFormData({
+                name: '',
+                category: '日用品',
+                brand: '',
+                size: '',
+                currentStock: 1,
+                minStock: 1,
+                lastPurchaseDate: new Date().toISOString().split('T')[0],
+                expiryDate: '',
+                memo: ''
+            });
+        }
+
+        // 商品モーダル非表示
+        function closeProductModal() {
+            document.getElementById('product-modal').classList.add('hidden');
+            editingProduct = null;
+        }
+
+        // 商品保存
+        function saveProduct() {
+            const formData = {
+                name: document.getElementById('product-name').value.trim(),
+                category: document.getElementById('product-category').value,
+                brand: document.getElementById('product-brand').value.trim(),
+                size: document.getElementById('product-size').value.trim(),
+                currentStock: parseInt(document.getElementById('product-current-stock').value) || 0,
+                minStock: parseInt(document.getElementById('product-min-stock').value) || 1,
+                lastPurchaseDate: document.getElementById('product-last-purchase').value,
+                expiryDate: document.getElementById('product-expiry').value || null,
+                memo: document.getElementById('product-memo').value.trim()
+            };
+
+            if (!formData.name) {
+                alert('商品名は必須項目です');
+                return;
+            }
+
+            if (editingProduct) {
+                const index = products.findIndex(p => p.id === editingProduct.id);
+                products[index] = { ...editingProduct, ...formData };
+            } else {
+                const newProduct = {
+                    ...formData,
+                    id: Date.now(),
+                    prices: []
+                };
+                products.push(newProduct);
+            }
+
+            closeProductModal();
+            renderProducts();
+            updatePriceProductSelect();
+        }
+
+        // 商品削除
+        function deleteProduct(id) {
+            const product = products.find(p => p.id === id);
+            if (!product) return;
+            
+            if (confirm(`「${product.name}」を削除しますか？`)) {
+                products = products.filter(p => p.id !== id);
+                renderProducts();
+                updatePriceProductSelect();
+            }
+        }
+
+        // 価格追加
+        function addPrice() {
+            const productId = parseInt(document.getElementById('price-product-select').value);
+            const store = document.getElementById('price-store-input').value.trim();
+            const price = parseInt(document.getElementById('price-value-input').value);
+            const date = document.getElementById('price-date-input').value;
+
+            if (!productId || !store || !price || !date) {
+                alert('すべての項目を入力してください');
+                return;
+            }
+
+            const product = products.find(p => p.id === productId);
+            if (!product) return;
+
+            product.prices.push({ store, price, date });
+
+            // フォームをクリア
+            document.getElementById('price-store-input').value = '';
+            document.getElementById('price-value-input').value = '';
+            document.getElementById('price-date-input').value = new Date().toISOString().split('T')[0];
+
+            renderPriceList();
+            renderProducts();
+        }
+
+        // 価格商品選択肢更新
+        function updatePriceProductSelect() {
+            const select = document.getElementById('price-product-select');
+            select.innerHTML = '<option value="">商品を選択</option>';
+            
+            products.forEach(product => {
+                const option = document.createElement('option');
+                option.value = product.id;
+                option.textContent = `${product.name} (${product.brand})`;
+                select.appendChild(option);
+            });
+        }
+
+        // 価格一覧レンダリング
+        function renderPriceList() {
+            const container = document.getElementById('price-list');
+            container.innerHTML = '';
+
+            if (products.length === 0) {
+                container.innerHTML = `
+                    <div class="empty-state">
+                        <i data-lucide="trending-up" style="width: 48px; height: 48px; color: #cbd5e1; margin-bottom: 16px;"></i>
+                        <p>商品がありません</p>
+                    </div>
+                `;
+                return;
+            }
+
+            products.forEach(product => {
+                const section = document.createElement('div');
+                section.className = 'price-section';
+                
+                section.innerHTML = `
+                    <h3>${product.name} <small>(${product.brand} - ${product.size})</small></h3>
+                    ${product.prices.length > 0 ? `
+                        <table class="price-table">
+                            <thead>
+                                <tr>
+                                    <th>店舗</th>
+                                    <th>価格</th>
+                                    <th>日付</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${product.prices
+                                    .sort((a, b) => a.price - b.price)
+                                    .map((price, index) => `
+                                        <tr ${index === 0 ? 'style="background: linear-gradient(135deg, #f0fdf4, #dcfce7);"' : ''}>
+                                            <td>${price.store} ${index === 0 ? '🏆' : ''}</td>
+                                            <td style="font-weight: 600; color: #059669;">¥${price.price.toLocaleString()}</td>
+                                            <td>${price.date}</td>
+                                        </tr>
+                                    `).join('')}
+                            </tbody>
+                        </table>
+                    ` : '<p class="no-prices">💡 価格情報がありません</p>'}
+                `;
+                container.appendChild(section);
+            });
+            
+            safeCreateIcons();
+        }
+
+        // ショッピングリストレンダリング
+        function renderShoppingList() {
+            const container = document.getElementById('shopping-list');
+            const shoppingList = products.filter(p => p.currentStock <= p.minStock);
+
+            if (shoppingList.length === 0) {
+                container.innerHTML = `
+                    <div class="empty-state">
+                        <i data-lucide="check-circle" class="empty-icon" style="width: 48px; height: 48px; color: #10b981;"></i>
+                        <h3 style="color: #059669; margin-bottom: 8px;">すべて十分な在庫があります！</h3>
+                        <p>購入が必要な商品はありません</p>
+                    </div>
+                `;
+            } else {
+                container.innerHTML = shoppingList.map(product => {
+                    const bestPrice = getBestPrice(product.prices);
+                    return `
+                        <div class="shopping-item">
+                            <div class="shopping-item-info">
+                                <h3>${product.name}</h3>
+                                <p class="shopping-item-details">${product.brand} - ${product.size}</p>
+                                <p class="shopping-item-stock">📦 在庫: ${product.currentStock} (最小: ${product.minStock})</p>
+                                ${bestPrice ? `<p class="shopping-item-price">💰 最安: ¥${bestPrice.price.toLocaleString()} (${bestPrice.store})</p>` : ''}
+                            </div>
+                            <div>
+                                <i data-lucide="shopping-cart" style="width: 32px; height: 32px; color: #667eea;"></i>
+                            </div>
+                        </div>
+                    `;
+                }).join('');
+            }
+            
+            safeCreateIcons();
+        }
+
+        // ページを離れる際にカメラを停止
+        window.addEventListener('beforeunload', function() {
+            stopCamera();
+        });
+
+        // ページが非表示になった時にもカメラを停止
+        document.addEventListener('visibilitychange', function() {
+            if (document.hidden && (isScanning || currentStream)) {
+                stopCamera();
+            }
+        });
+
+        // モーダル外クリックで閉じる
+        document.addEventListener('click', function(e) {
+            if (e.target.classList.contains('modal')) {
+                if (e.target.id === 'jan-search-modal') {
+                    closeJanSearchModal();
+                } else if (e.target.id === 'product-modal') {
+                    closeProductModal();
+                }
+            }
+        });
+    </script>
+</body>
+</html>
