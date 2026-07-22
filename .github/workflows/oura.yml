@@ -1,0 +1,41 @@
+name: Oura Daily Log
+
+on:
+  schedule:
+    # 22:00 UTC = 07:00 JST (next day)
+    - cron: '0 22 * * *'
+  workflow_dispatch:
+
+jobs:
+  log:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Fetch Oura data and update log
+        env:
+          OURA_TOKEN: ${{ secrets.OURA_TOKEN }}
+        run: python scripts/oura_daily_log.py
+
+      - name: Commit and push changes
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add Health/oura-log.md
+          if git diff --cached --quiet; then
+            echo "No changes to commit."
+          else
+            git commit -m "chore: add Oura daily log entry"
+            git push
+          fi
